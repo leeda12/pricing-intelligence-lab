@@ -6,7 +6,9 @@ Pricing Intelligence Lab turns synthetic transaction history into an auditable n
 
 ## Application preview
 
-> **Screenshot placeholder:** Add a polished screenshot of the populated pricing dashboard here before portfolio launch.
+![Pricing Intelligence Lab dashboard showing the synthetic Northstar Outfitters and Atlas Widget example](docs/pricing-intelligence-dashboard.png)
+
+*The dashboard shows the synthetic Northstar Outfitters and Atlas Widget example.*
 
 ## Features
 
