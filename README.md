@@ -18,7 +18,8 @@ Pricing Intelligence Lab turns synthetic transaction history into an auditable n
 - Filters analysis by fictional customer and product.
 - Charts observed unit prices alongside a fitted regression trend.
 - Optionally identifies outliers using the 1.5×IQR rule and explicitly lists every excluded source row.
-- Calculates an ordinary least-squares trend and recommends a price for the following calendar year.
+- Calculates an ordinary least-squares trend and recommends a price for the following calendar year only after one specific customer and product are selected.
+- Keeps aggregate selections in exploration mode without combining unrelated cohorts into one regression.
 - Explains the slope, intercept, fitted sample size, prediction, and R² in plain language.
 - Exports a standalone HTML recommendation report.
 - Provides clear empty, loading, success, validation-error, and server-error states.

@@ -26,6 +26,7 @@ export interface OutlierResult {
 }
 
 export interface AnalysisResponse {
+  recommendationEligible: boolean;
   observations: Observation[];
   includedObservations: Observation[];
   excludedObservations: Observation[];

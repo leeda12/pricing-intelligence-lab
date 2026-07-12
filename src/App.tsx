@@ -31,6 +31,9 @@ export default function App() {
   }, [customer, product, excludeOutliers]);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    if (!customer || !product) setExcludeOutliers(false);
+  }, [customer, product]);
 
   async function importCsv(event: React.FormEvent) {
     event.preventDefault();
@@ -55,6 +58,7 @@ export default function App() {
     trendPrice: analysis.regression ? analysis.regression.slope * decimalYear(row.date) + analysis.regression.intercept : null,
   })) ?? [], [analysis]);
   const excludedIds = new Set(analysis?.excludedObservations.map((row) => row.id));
+  const recommendationEligible = analysis?.recommendationEligible === true;
 
   return <main>
     <header className="hero">
@@ -74,25 +78,26 @@ export default function App() {
         <div className="section-heading"><span>02</span><div><h2>Define cohort</h2><p>Choose a customer and product.</p></div></div>
         <label>Customer<select value={customer} onChange={(event) => setCustomer(event.target.value)}><option value="">All customers</option>{dimensions.customers.map((value) => <option key={value}>{value}</option>)}</select></label>
         <label>Product<select value={product} onChange={(event) => setProduct(event.target.value)}><option value="">All products</option>{dimensions.products.map((value) => <option key={value}>{value}</option>)}</select></label>
-        <label className="toggle"><input type="checkbox" checked={excludeOutliers} onChange={(event) => setExcludeOutliers(event.target.checked)} /><span><strong>Exclude IQR outliers</strong><small>Always disclosed below; originals remain stored.</small></span></label>
+        <label className={`toggle ${!customer || !product ? 'disabled' : ''}`}><input type="checkbox" checked={excludeOutliers} disabled={!customer || !product} onChange={(event) => setExcludeOutliers(event.target.checked)} /><span><strong>Exclude IQR outliers</strong><small>{customer && product ? 'Always disclosed below; originals remain stored.' : 'Select a specific customer and product first.'}</small></span></label>
       </aside>
 
       <div className="results">
         {!analysis?.observations.length ? <EmptyState loading={status.kind === 'loading'} /> : <>
-          <section className="metrics">
+          {recommendationEligible && <section className="metrics">
             <Metric label="Recommended price" value={analysis.regression ? money.format(analysis.regression.predictedPrice) : 'Need more data'} accent />
             <Metric label="Prediction year" value={analysis.regression?.predictionYear.toString() ?? '—'} />
             <Metric label="Annual trend" value={analysis.regression ? `${analysis.regression.slope >= 0 ? '+' : ''}${money.format(analysis.regression.slope)}` : '—'} />
             <Metric label="Model fit (R²)" value={analysis.regression ? analysis.regression.rSquared.toFixed(3) : '—'} />
-          </section>
+          </section>}
+          {!recommendationEligible && <AggregateExploration />}
           <section className="panel chart-panel">
-            <div className="panel-title"><div><span className="eyebrow">HISTORICAL UNIT PRICE</span><h2>{customer || 'All customers'} · {product || 'All products'}</h2><p className="chart-context">Solid green shows observed prices. Dashed blue shows the regression trend. Orange rings identify excluded IQR outliers when enabled.</p></div><button className="secondary" onClick={() => exportReport(analysis, customer, product, excludeOutliers)}>Export report</button></div>
-            <div className="chart"><ResponsiveContainer width="100%" height="100%"><LineChart data={chartData} margin={{ top: 16, right: 20, bottom: 8, left: 8 }}><CartesianGrid strokeDasharray="3 3" stroke="#dfe5e2" /><XAxis dataKey="label" tickFormatter={formatChartDate} interval="preserveStartEnd" minTickGap={52} tick={{ fontSize: 12 }} /><YAxis tickFormatter={(value) => `$${value}`} tick={{ fontSize: 12 }} domain={['auto', 'auto']} /><Tooltip labelFormatter={(label) => formatFullDate(String(label))} formatter={(value, name) => [money.format(Number(value)), name]} /><Legend /><Line name="Observed price" type="monotone" dataKey="price" stroke="#176b5b" strokeWidth={2.5} dot={(props) => <circle key={`dot-${props.payload.id}`} cx={props.cx} cy={props.cy} r={excludedIds.has(props.payload.id) ? 6 : 4} fill={excludedIds.has(props.payload.id) ? '#d95d39' : '#176b5b'} stroke="#fff" strokeWidth={2} />} /><Line name="Regression trend" type="linear" dataKey="trendPrice" stroke="#314a78" strokeWidth={2.5} strokeDasharray="8 5" dot={false} activeDot={false} />{analysis.excludedObservations.map((row) => <ReferenceDot key={row.id} x={row.date} y={row.unitPrice} r={8} fill="none" stroke="#d95d39" strokeWidth={2} />)}</LineChart></ResponsiveContainer></div>
+            <div className="panel-title"><div><span className="eyebrow">HISTORICAL UNIT PRICE</span><h2>{customer || 'All customers'} · {product || 'All products'}</h2><p className="chart-context">{recommendationEligible ? 'Solid green shows observed prices. Dashed blue shows the regression trend. Orange rings identify excluded IQR outliers when enabled.' : 'Observed prices are shown for aggregate exploration only. Select one customer and one product to fit a regression trend.'}</p></div>{recommendationEligible && <button className="secondary" onClick={() => exportReport(analysis, customer, product, excludeOutliers)}>Export report</button>}</div>
+            <div className="chart"><ResponsiveContainer width="100%" height="100%"><LineChart data={chartData} margin={{ top: 16, right: 20, bottom: 8, left: 8 }}><CartesianGrid strokeDasharray="3 3" stroke="#dfe5e2" /><XAxis dataKey="label" tickFormatter={formatChartDate} interval="preserveStartEnd" minTickGap={52} tick={{ fontSize: 12 }} /><YAxis tickFormatter={(value) => `$${value}`} tick={{ fontSize: 12 }} domain={['auto', 'auto']} /><Tooltip labelFormatter={(label) => formatFullDate(String(label))} formatter={(value, name) => [money.format(Number(value)), name]} /><Legend /><Line name="Observed price" type="monotone" dataKey="price" stroke="#176b5b" strokeWidth={2.5} dot={(props) => <circle key={`dot-${props.payload.id}`} cx={props.cx} cy={props.cy} r={excludedIds.has(props.payload.id) ? 6 : 4} fill={excludedIds.has(props.payload.id) ? '#d95d39' : '#176b5b'} stroke="#fff" strokeWidth={2} />} />{recommendationEligible && <Line name="Regression trend" type="linear" dataKey="trendPrice" stroke="#314a78" strokeWidth={2.5} strokeDasharray="8 5" dot={false} activeDot={false} />}{recommendationEligible && analysis.excludedObservations.map((row) => <ReferenceDot key={row.id} x={row.date} y={row.unitPrice} r={8} fill="none" stroke="#d95d39" strokeWidth={2} />)}</LineChart></ResponsiveContainer></div>
           </section>
-          <section className="two-column">
+          {recommendationEligible && <section className="two-column">
             <Explanation analysis={analysis} excludeOutliers={excludeOutliers} />
             <ExcludedTable rows={analysis.excludedObservations} enabled={excludeOutliers} />
-          </section>
+          </section>}
         </>}
       </div>
     </section>
@@ -101,6 +106,7 @@ export default function App() {
 }
 
 function Metric({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) { return <div className={`metric ${accent ? 'accent' : ''}`}><span>{label}</span><strong>{value}</strong></div>; }
+function AggregateExploration() { return <section className="aggregate-guidance" role="status"><div className="aggregate-icon">◎</div><div><span className="eyebrow">EXPLORATION MODE</span><h2>Select a specific customer and product for a recommendation</h2><p>Aggregate selections can be explored in the observed-price chart, but regression KPIs and reports are intentionally unavailable because unrelated cohorts should not share one fitted model.</p></div></section>; }
 function decimalYear(date: string): number { const parsed = new Date(`${date}T00:00:00Z`); const year = parsed.getUTCFullYear(); return year + (parsed.getTime() - Date.UTC(year, 0, 1)) / (Date.UTC(year + 1, 0, 1) - Date.UTC(year, 0, 1)); }
 function formatChartDate(date: string): string { return new Intl.DateTimeFormat('en-US', { month: 'short', year: '2-digit', timeZone: 'UTC' }).format(new Date(`${date}T00:00:00Z`)); }
 function formatFullDate(date: string): string { return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${date}T00:00:00Z`)); }
@@ -112,6 +118,7 @@ function Explanation({ analysis, excludeOutliers }: { analysis: AnalysisResponse
 function ExcludedTable({ rows, enabled }: { rows: Observation[]; enabled: boolean }) { return <section className="panel exclusions"><span className="eyebrow">OUTLIER DISCLOSURE</span><h2>{enabled ? `${rows.length} excluded observation${rows.length === 1 ? '' : 's'}` : 'No exclusions applied'}</h2>{enabled && rows.length ? <div className="table-wrap"><table><thead><tr><th>Source row</th><th>Date</th><th>Price</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td>{row.sourceRow}</td><td>{row.date}</td><td>{money.format(row.unitPrice)}</td></tr>)}</tbody></table></div> : <p>{enabled ? 'No prices fall outside the 1.5× IQR bounds.' : 'Every imported observation is included in the regression.'}</p>}</section>; }
 
 function exportReport(analysis: AnalysisResponse, customer: string, product: string, excludeOutliers: boolean) {
+  if (!analysis.recommendationEligible) return;
   const regression = analysis.regression;
   const escaped = (value: string) => value.replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[character]!);
   const rows = analysis.excludedObservations.map((row) => `<tr><td>${row.sourceRow}</td><td>${escaped(row.date)}</td><td>${money.format(row.unitPrice)}</td></tr>`).join('');

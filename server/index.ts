@@ -4,6 +4,7 @@ import multer from 'multer';
 import { parse } from 'csv-parse/sync';
 import { z } from 'zod';
 import { identifyOutliers, linearRegression } from '../shared/calculations.js';
+import { isRecommendationEligible } from '../shared/eligibility.js';
 import { replaceObservations, listDimensions, listObservations } from './database.js';
 
 const app = express();
@@ -50,9 +51,21 @@ app.get('/api/analysis', (request, response) => {
   const product = typeof request.query.product === 'string' ? request.query.product : undefined;
   const excludeOutliers = request.query.excludeOutliers === 'true';
   const observations = listObservations(customer, product);
+  const recommendationEligible = isRecommendationEligible(customer, product);
+  if (!recommendationEligible) {
+    return response.json({
+      recommendationEligible,
+      observations,
+      includedObservations: observations,
+      excludedObservations: [],
+      regression: null,
+      outlierBounds: null,
+    });
+  }
   const outliers = identifyOutliers(observations);
   const included = excludeOutliers ? outliers.included : observations;
   response.json({
+    recommendationEligible,
     observations, includedObservations: included,
     excludedObservations: excludeOutliers ? outliers.excluded : [],
     regression: linearRegression(included),
