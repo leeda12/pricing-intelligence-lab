@@ -1,0 +1,21 @@
+date,customer,product,quantity,unit_price
+2021-02-15,Northstar Outfitters,Atlas Widget,120,18.40
+2021-08-20,Northstar Outfitters,Atlas Widget,95,18.90
+2022-03-10,Northstar Outfitters,Atlas Widget,130,19.35
+2022-09-18,Northstar Outfitters,Atlas Widget,110,19.80
+2023-04-12,Northstar Outfitters,Atlas Widget,145,20.30
+2023-10-09,Northstar Outfitters,Atlas Widget,100,20.85
+2024-05-14,Northstar Outfitters,Atlas Widget,150,21.40
+2024-11-22,Northstar Outfitters,Atlas Widget,80,34.90
+2025-03-08,Northstar Outfitters,Atlas Widget,155,22.10
+2025-10-16,Northstar Outfitters,Atlas Widget,140,22.65
+2021-01-21,Copper Finch Market,Beacon Sleeve,75,9.20
+2022-02-17,Copper Finch Market,Beacon Sleeve,82,9.55
+2023-03-23,Copper Finch Market,Beacon Sleeve,90,9.95
+2024-04-19,Copper Finch Market,Beacon Sleeve,96,10.30
+2025-05-27,Copper Finch Market,Beacon Sleeve,105,10.75
+2021-06-11,Juniper & Vale,Meridian Case,60,27.50
+2022-06-15,Juniper & Vale,Meridian Case,65,28.10
+2023-06-20,Juniper & Vale,Meridian Case,72,29.00
+2024-06-24,Juniper & Vale,Meridian Case,78,29.85
+2025-06-30,Juniper & Vale,Meridian Case,84,30.60
