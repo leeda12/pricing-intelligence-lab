@@ -1,8 +1,8 @@
 # Pricing Intelligence Lab
 
-Pricing Intelligence Lab turns synthetic transaction history into an auditable next-year price recommendation. It gives pricing teams a transparent workflow for importing observations, exploring customer-product trends, comparing optional outlier treatment, and explaining the model behind a recommendation.
+Pricing Intelligence Lab turns synthetic transaction history into an auditable next-year price recommendation. It gives pricing teams a transparent workflow for exploring customer-product trends, comparing optional outlier treatment, and understanding the model behind a recommendation.
 
-> **Portfolio status:** This application currently runs locally and is not deployed.
+> **Portfolio status:** The application is prepared for deployment but is not publicly deployed yet.
 
 ## Application preview
 
@@ -10,25 +10,34 @@ Pricing Intelligence Lab turns synthetic transaction history into an auditable n
 
 *The dashboard shows the synthetic Northstar Outfitters and Atlas Widget example.*
 
+## Hosted public demo
+
+> **Public portfolio demo using entirely fictional data. Data uploads are disabled.**
+
+The production configuration uses the included fictional sample dataset. When `NODE_ENV=production` and `ALLOW_IMPORTS=false`, the server:
+
+- seeds `sample-data/SYNTHETIC_SAMPLE_pricing_history.csv` only when the SQLite database is empty;
+- never replaces existing persistent data during a restart or redeployment;
+- returns HTTP 403 for the import endpoint;
+- hides CSV upload controls in the interface; and
+- preserves filtering, aggregate exploration, cohort recommendations, IQR comparison, charts, rationale, and fictional report export.
+
 ## Features
 
-- Imports and validates historical pricing observations from CSV.
-- Transactionally replaces the current dataset so repeated imports never create duplicates.
-- Preserves every original observation from the current successful import.
 - Filters analysis by fictional customer and product.
-- Charts observed unit prices alongside a fitted regression trend.
-- Optionally identifies outliers using the 1.5×IQR rule and explicitly lists every excluded source row.
-- Calculates an ordinary least-squares trend and recommends a price for the following calendar year only after one specific customer and product are selected.
-- Keeps aggregate selections in exploration mode without combining unrelated cohorts into one regression.
-- Explains the slope, intercept, fitted sample size, prediction, and R² in plain language.
-- Exports a standalone HTML recommendation report.
+- Preserves aggregate selections for observed-price exploration without combining unrelated cohorts into one regression.
+- Fits ordinary least-squares regression only after one specific customer and product are selected.
+- Optionally identifies outliers with the 1.5×IQR rule and explicitly lists every excluded source row.
+- Explains slope, intercept, fitted sample size, prediction, and R² in plain language.
+- Exports a standalone fictional HTML recommendation report.
 - Provides clear empty, loading, success, validation-error, and server-error states.
+- Supports validated, transactional CSV replacement during local development.
 
 ## Fictional data notice
 
 All customer names, product names, prices, quantities, and transaction records included in this repository are entirely fictional and were created solely for demonstration. The project contains no proprietary, confidential, or real customer data.
 
-The ready-to-use example is clearly labeled at `sample-data/SYNTHETIC_SAMPLE_pricing_history.csv`.
+The included dataset is `sample-data/SYNTHETIC_SAMPLE_pricing_history.csv`.
 
 ## Technology stack
 
@@ -36,10 +45,11 @@ The ready-to-use example is clearly labeled at `sample-data/SYNTHETIC_SAMPLE_pri
 - **Backend:** Node.js 24, Express, TypeScript
 - **Persistence:** SQLite through Node's built-in `node:sqlite` module
 - **Validation and import:** Zod, csv-parse, Multer
-- **Testing:** Vitest
+- **Security:** Helmet, same-origin production delivery, targeted API rate limits
+- **Testing:** Vitest, Supertest
 - **Automation:** GitHub Actions
 
-## Quick start
+## Local development
 
 Requirements: Node.js 24 LTS and npm.
 
@@ -48,49 +58,98 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173`, choose `sample-data/SYNTHETIC_SAMPLE_pricing_history.csv`, and select **Import observations**. The local API runs at `http://localhost:3001`.
+Open `http://localhost:5173`. Local development enables CSV importing by default. Importing a valid CSV transactionally replaces the fictional dataset in that user's local SQLite database; validation failures leave the previous valid dataset intact.
 
-Copy `.env.example` to `.env` only if you want to change the API port or database path. Never commit `.env`.
+Local import mode must not be deployed as an import-enabled shared public service. Local imports should not be used for sensitive, confidential, personal, proprietary, or regulated data without an independent security and legal review. Running the project locally is not, by itself, a guarantee of privacy or security.
+
+Copy `.env.example` to `.env` to override local settings. Never commit `.env`.
+
+## CSV format and validation
+
+Headers must be exactly:
+
+```text
+date,customer,product,quantity,unit_price
+```
+
+Dates must be real calendar dates in `YYYY-MM-DD` format. Customer and product names are limited to 100 characters. Quantity and unit price must be positive, finite values no greater than 1,000,000,000. Imports are limited to 10,000 rows and 2 MB. Invalid imports return clear HTTP 400, 413, or 422 responses without logging uploaded CSV contents.
 
 ## Architecture
 
-- `src/`: React interface, Recharts visualization, report export, and user-facing states.
-- `server/`: Express API, CSV validation, and local SQLite persistence.
-- `shared/`: framework-independent types, IQR detection, and ordinary least-squares regression.
+The production build is a single same-origin Node service:
+
+```text
+Browser
+  └── Express
+      ├── /api/*       JSON API
+      ├── /assets/*    Vite production assets
+      ├── /*            SPA fallback
+      └── SQLite        persistent-volume path
+```
+
+- `src/`: React interface, visualization, report export, and user-facing states.
+- `server/`: Express API, production static serving, CSV validation, seeding, and SQLite lifecycle.
+- `shared/`: framework-independent types, eligibility, IQR detection, and regression.
 - `sample-data/`: clearly labeled fictional data.
-
-The browser calls the local Express API through Vite's development proxy. This single-dataset MVP validates the complete CSV first, then transactionally replaces the prior dataset. A failed validation leaves the previous valid dataset untouched. Analysis may explicitly omit flagged rows from a regression, but it never changes the original observations from the current import.
-
-## CSV format
-
-Headers must be exactly `date,customer,product,quantity,unit_price`. Dates use `YYYY-MM-DD`; quantity and price must be positive numbers. Validation rejects the entire import and reports source row numbers if any row is invalid.
 
 ## Calculation methodology
 
-Linear regression uses ordinary least squares with decimal year as `x` and unit price as `y`. The recommendation evaluates the fitted line at the calendar year after the latest observation. The interface shows slope, intercept, sample size, prediction, and R².
+Linear regression uses ordinary least squares with decimal year as `x` and unit price as `y`. The recommendation evaluates the fitted line at the calendar year after the latest observation. A recommendation is available only for a specific customer-product cohort.
 
-Optional outliers use Tukey's rule: prices below `Q1 − 1.5 × IQR` or above `Q3 + 1.5 × IQR` are flagged. Exclusion is off by default. When enabled, every excluded observation is highlighted on the chart and listed with its original CSV row number. Stored observations remain unchanged.
+Optional outliers use Tukey's rule: prices below `Q1 − 1.5 × IQR` or above `Q3 + 1.5 × IQR` are flagged. Exclusion is off by default. When enabled, every excluded observation is highlighted and listed with its original CSV row number. Stored observations remain unchanged.
 
-## Testing and production build
+## Production build and runtime
 
 ```powershell
-npm test
+npm ci
 npm run build
 npm start
 ```
 
-Tests cover regression behavior, insufficient data, IQR detection, transactional replacement, repeated imports, and rollback preservation. `npm run build` compiles the server and creates the frontend in `dist/`.
+`npm run build` first removes stale `dist/` and `dist-server/` output, then compiles the API and Vite frontend. `npm start` serves the compiled API and frontend from one process.
+
+Required runtime configuration:
+
+| Variable | Public-demo value | Purpose |
+|---|---|---|
+| `NODE_ENV` | `production` | Enables production behavior and asset caching. |
+| `ALLOW_IMPORTS` | `false` | Disables every import endpoint and upload control. |
+| `PORT` | Platform-provided | HTTP listening port; defaults to `3001`. |
+| `DATABASE_PATH` | Persistent-volume file path | Absolute or relative writable SQLite path. |
+
+Health-check endpoint: `GET /api/health` returns HTTP 200 with `{"status":"ok"}`.
+
+## Railway or Render deployment requirements
+
+Use one Node application instance and one attached persistent volume. SQLite is not appropriate for horizontal replicas in this design.
+
+- **Railway:** mount a volume at `/app/data` and set `DATABASE_PATH=/app/data/pricing-lab.db`.
+- **Render:** attach a persistent disk at a writable mount such as `/opt/render/project/src/data` and set `DATABASE_PATH=/opt/render/project/src/data/pricing-lab.db`.
+- Build command: `npm ci && npm run build`
+- Start command: `npm start`
+- Health path: `/api/health`
+
+The hosting service, persistent volume, environment variables, and health check still need to be configured before deployment. Keep the service at exactly one application instance and configure platform backups for the persistent volume.
+
+## Testing
+
+```powershell
+npm test
+npm run build
+```
+
+Tests cover calculations, eligibility, CSV safety limits, transactional replacement, rollback preservation, production import blocking, empty-only fictional seeding, restart persistence, static asset serving, JSON API 404s, health checks, aggregate exploration, and cohort recommendations.
 
 GitHub Actions runs `npm ci`, `npm test`, and `npm run build` on pushes and pull requests to `main`.
 
 ## Limitations and future improvements
 
-- The MVP supports one active local dataset rather than multiple named datasets or organizations.
-- Recommendations use a simple time-based linear model and do not yet incorporate volume, cost, seasonality, elasticity, or competitive signals.
-- Outlier detection operates on unit price only and requires a user-controlled exclusion decision.
-- SQLite is intended for local evaluation; a deployed version would need managed persistence, backups, and access controls.
-- Report export is standalone HTML rather than a branded PDF or shareable hosted report.
-- Future work could add model comparisons, confidence intervals, scenario analysis, richer regression diagnostics, accessible data-table views, and deployment automation.
+- The MVP supports one active dataset rather than multiple named datasets or organizations.
+- Recommendations do not yet incorporate cost, seasonality, elasticity, or competitive signals.
+- SQLite requires a single application instance and persistent storage.
+- Public production imports are intentionally unavailable; a multi-user import service would require authentication, authorization, isolated datasets, and a managed database.
+- Report export is standalone HTML rather than a branded PDF or hosted report.
+- Future work could add confidence intervals, scenario analysis, richer diagnostics, accessible data-table views, and managed-database support.
 
 ## Repository safety
 

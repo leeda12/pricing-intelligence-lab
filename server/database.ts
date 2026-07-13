@@ -20,25 +20,46 @@ export function createObservationStore(path: string) {
     )
   `);
 
-  function replaceObservations(rows: Omit<Observation, 'id' | 'importedAt'>[]): number {
   const insert = database.prepare(`
     INSERT INTO observations (source_row, date, customer, product, quantity, unit_price, imported_at)
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
-  const importedAt = new Date().toISOString();
-  database.exec('BEGIN');
-  try {
-    database.exec('DELETE FROM observations');
-    database.exec("DELETE FROM sqlite_sequence WHERE name = 'observations'");
+
+  function insertRows(rows: Omit<Observation, 'id' | 'importedAt'>[], importedAt: string): void {
     for (const row of rows) {
       insert.run(row.sourceRow, row.date, row.customer, row.product, row.quantity, row.unitPrice, importedAt);
     }
-    database.exec('COMMIT');
-    return rows.length;
-  } catch (error) {
-    database.exec('ROLLBACK');
-    throw error;
   }
+
+  function replaceObservations(rows: Omit<Observation, 'id' | 'importedAt'>[]): number {
+    database.exec('BEGIN IMMEDIATE');
+    try {
+      database.exec('DELETE FROM observations');
+      database.exec("DELETE FROM sqlite_sequence WHERE name = 'observations'");
+      insertRows(rows, new Date().toISOString());
+      database.exec('COMMIT');
+      return rows.length;
+    } catch (error) {
+      database.exec('ROLLBACK');
+      throw error;
+    }
+  }
+
+  function seedIfEmpty(rows: Omit<Observation, 'id' | 'importedAt'>[]): boolean {
+    database.exec('BEGIN IMMEDIATE');
+    try {
+      const count = Number((database.prepare('SELECT COUNT(*) AS count FROM observations').get() as { count: number }).count);
+      if (count > 0) {
+        database.exec('COMMIT');
+        return false;
+      }
+      insertRows(rows, new Date().toISOString());
+      database.exec('COMMIT');
+      return true;
+    } catch (error) {
+      database.exec('ROLLBACK');
+      throw error;
+    }
   }
 
   function listObservations(customer?: string, product?: string): Observation[] {
@@ -62,10 +83,5 @@ export function createObservationStore(path: string) {
   return { customers, products, total };
   }
 
-  return { replaceObservations, listObservations, listDimensions, close: () => database.close() };
+  return { replaceObservations, seedIfEmpty, listObservations, listDimensions, close: () => database.close() };
 }
-
-const store = createObservationStore(process.env.DATABASE_PATH ?? './data/pricing-lab.db');
-export const replaceObservations = store.replaceObservations;
-export const listObservations = store.listObservations;
-export const listDimensions = store.listDimensions;

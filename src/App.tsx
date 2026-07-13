@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CartesianGrid, Legend, Line, LineChart, ReferenceDot, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { AnalysisResponse, Observation } from '../shared/types';
+import { shouldShowImportControls } from './importPolicy';
 
 type Status = { kind: 'idle' | 'loading' | 'success' | 'validation' | 'server'; message?: string; details?: string[] };
 type Dimensions = { customers: string[]; products: string[]; total: number };
+type RuntimeConfig = { allowImports: boolean; publicDemo: boolean };
 
 const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
@@ -15,13 +17,15 @@ export default function App() {
   const [excludeOutliers, setExcludeOutliers] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
+  const [runtimeConfig, setRuntimeConfig] = useState<RuntimeConfig | null>(null);
 
   const load = useCallback(async () => {
     setStatus((current) => current.kind === 'success' ? current : { kind: 'loading', message: 'Loading observations…' });
     try {
       const query = new URLSearchParams({ ...(customer && { customer }), ...(product && { product }), excludeOutliers: String(excludeOutliers) });
-      const [dimensionResponse, analysisResponse] = await Promise.all([fetch('/api/dimensions'), fetch(`/api/analysis?${query}`)]);
-      if (!dimensionResponse.ok || !analysisResponse.ok) throw new Error('Server response was not successful.');
+      const [configResponse, dimensionResponse, analysisResponse] = await Promise.all([fetch('/api/config'), fetch('/api/dimensions'), fetch(`/api/analysis?${query}`)]);
+      if (!configResponse.ok || !dimensionResponse.ok || !analysisResponse.ok) throw new Error('Server response was not successful.');
+      setRuntimeConfig(await configResponse.json());
       setDimensions(await dimensionResponse.json());
       setAnalysis(await analysisResponse.json());
       setStatus((current) => current.kind === 'success' ? current : { kind: 'idle' });
@@ -37,6 +41,7 @@ export default function App() {
 
   async function importCsv(event: React.FormEvent) {
     event.preventDefault();
+    if (!runtimeConfig?.allowImports) return setStatus({ kind: 'validation', message: 'Data uploads are disabled in the public portfolio demo.' });
     if (!file) return setStatus({ kind: 'validation', message: 'Select a CSV file before importing.' });
     setStatus({ kind: 'loading', message: 'Validating and importing the CSV…' });
     const form = new FormData(); form.append('file', file);
@@ -59,6 +64,7 @@ export default function App() {
   })) ?? [], [analysis]);
   const excludedIds = new Set(analysis?.excludedObservations.map((row) => row.id));
   const recommendationEligible = analysis?.recommendationEligible === true;
+  const showImportControls = shouldShowImportControls(runtimeConfig?.allowImports);
 
   return <main>
     <header className="hero">
@@ -68,11 +74,12 @@ export default function App() {
 
     <section className="workspace">
       <aside className="panel controls">
-        <div className="section-heading"><span>01</span><div><h2>Import data</h2><p>Required: date, customer, product, quantity, unit_price</p></div></div>
-        <form onSubmit={importCsv}>
+        <div className="section-heading"><span>01</span><div><h2>{showImportControls ? 'Import data' : 'Demo dataset'}</h2><p>{showImportControls ? 'Required: date, customer, product, quantity, unit_price' : 'The included fictional sample is loaded automatically.'}</p></div></div>
+        {runtimeConfig?.publicDemo && <div className="public-demo-notice" role="status">Public portfolio demo using entirely fictional data. Data uploads are disabled.</div>}
+        {showImportControls && <form onSubmit={importCsv}>
           <label className="file-input" htmlFor="csv-file"><span>{file?.name ?? 'Choose synthetic CSV'}</span><input id="csv-file" type="file" accept=".csv,text/csv" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></label>
           <button className="primary" disabled={status.kind === 'loading'}>{status.kind === 'loading' ? 'Working…' : 'Import observations'}</button>
-        </form>
+        </form>}
         {status.kind !== 'idle' && <div className={`notice ${status.kind}`} role="status"><strong>{status.kind === 'success' ? 'Import complete' : status.kind === 'validation' ? 'Check your file' : status.kind === 'server' ? 'Server error' : 'Please wait'}</strong><p>{status.message}</p>{status.details?.map((detail) => <small key={detail}>{detail}</small>)}</div>}
 
         <div className="section-heading"><span>02</span><div><h2>Define cohort</h2><p>Choose a customer and product.</p></div></div>
