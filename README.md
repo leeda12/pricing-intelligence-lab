@@ -2,7 +2,9 @@
 
 Pricing Intelligence Lab turns synthetic transaction history into an auditable next-year price recommendation. It gives pricing teams a transparent workflow for exploring customer-product trends, comparing optional outlier treatment, and understanding the model behind a recommendation.
 
-> **Portfolio status:** The application is prepared for deployment but is not publicly deployed yet.
+**[Open the live demo](https://pricing-intelligence-lab-production.up.railway.app)**
+
+> **Public portfolio demo using entirely fictional data. Data uploads are disabled.**
 
 ## Application preview
 
@@ -14,13 +16,21 @@ Pricing Intelligence Lab turns synthetic transaction history into an auditable n
 
 > **Public portfolio demo using entirely fictional data. Data uploads are disabled.**
 
-The production configuration uses the included fictional sample dataset. When `NODE_ENV=production` and `ALLOW_IMPORTS=false`, the server:
+The hosted Railway application uses the included fictional sample dataset. When `NODE_ENV=production` and `ALLOW_IMPORTS=false`, the server:
 
 - seeds `sample-data/SYNTHETIC_SAMPLE_pricing_history.csv` only when the SQLite database is empty;
 - never replaces existing persistent data during a restart or redeployment;
 - returns HTTP 403 for the import endpoint;
 - hides CSV upload controls in the interface; and
 - preserves filtering, aggregate exploration, cohort recommendations, IQR comparison, charts, rationale, and fictional report export.
+
+## Try the demo
+
+1. Open the [live Pricing Intelligence Lab](https://pricing-intelligence-lab-production.up.railway.app).
+2. Select **Northstar Outfitters** as the customer.
+3. Select **Atlas Widget** as the product.
+4. Enable **Exclude IQR outliers**.
+5. Observe the auditable next-year recommendation of **$22.85**, along with the fitted regression trend and the explicitly identified excluded observation.
 
 ## Features
 
@@ -119,17 +129,20 @@ Required runtime configuration:
 
 Health-check endpoint: `GET /api/health` returns HTTP 200 with `{"status":"ok"}`.
 
-## Railway or Render deployment requirements
+## Deployment
 
-Use one Node application instance and one attached persistent volume. SQLite is not appropriate for horizontal replicas in this design.
+The public portfolio demo is deployed on Railway from the `main` branch. Railway automatically deploys new commits pushed to `main`.
 
-- **Railway:** mount a volume at `/app/data` and set `DATABASE_PATH=/app/data/pricing-lab.db`.
-- **Render:** attach a persistent disk at a writable mount such as `/opt/render/project/src/data` and set `DATABASE_PATH=/opt/render/project/src/data/pricing-lab.db`.
-- Build command: `npm ci && npm run build`
+- Platform: Railway
+- Architecture: one Node service with exactly one application instance
+- Persistence: one attached SQLite volume mounted at `/app/data`
+- Database path: `/app/data/pricing-lab.db`
+- Build command: `npm run build` (Railway installs dependencies before this step)
 - Start command: `npm start`
-- Health path: `/api/health`
+- Health check: [`/api/health`](https://pricing-intelligence-lab-production.up.railway.app/api/health)
+- Deployment source: automatic deployments from `main`
 
-The hosting service, persistent volume, environment variables, and health check still need to be configured before deployment. Keep the service at exactly one application instance and configure platform backups for the persistent volume.
+SQLite requires the service to remain at one application instance because this design does not support concurrent replicas sharing a single database file. The attached persistent volume preserves the fictional dataset across application restarts and redeployments.
 
 ## Testing
 
