@@ -164,6 +164,10 @@ GitHub Actions runs `npm ci`, `npm test`, and `npm run build` on pushes and pull
 - Report export is standalone HTML rather than a branded PDF or hosted report.
 - Future work could add confidence intervals, scenario analysis, richer diagnostics, accessible data-table views, and managed-database support.
 
+## License and usage
+
+Copyright © 2026 Adeel Tagar. All rights reserved. This repository is publicly available for portfolio review only. Commercial use, redistribution, modification, hosting, deployment, or incorporation into another product is not permitted without prior written authorization. See [LICENSE](LICENSE).
+
 ## Repository safety
 
 Generated databases, reports, secrets, dependency folders, build output, logs, and coverage are excluded through `.gitignore`.
